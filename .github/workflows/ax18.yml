@@ -1,73 +1,159 @@
-name: Build OpenWrt for AX18
+name: AX18-IPQ6018-NOWIFI
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: 0 20 * * *
+
+env:
+  REPO_URL: https://github.com/LiBwrt/openwrt-6.x.git
+  REPO_BRANCH: k6.12-nss
+  CONFIG_FILE: configs/ax18-nowifi.config
+  DIY_SCRIPT: diy-script.sh
+  CLASH_KERNEL: amd64
+  CACHE_TOOLCHAIN: true
+  UPLOAD_BIN_DIR: false
+  FIRMWARE_RELEASE: true
+  FIRMWARE_TAG: AX18-NOWIFI
+  TZ: Asia/Shanghai
 
 jobs:
-  build:
-    runs-on: ubuntu-20.04
+  Build:
+    runs-on: ubuntu-22.04
+
     steps:
-      - name: Checkout Source
-        uses: actions/checkout@v3
+    - name: Check Server Performance
+      run: |
+        echo "⚠️ 注意服务器性能，防止内存/磁盘爆掉"
+        echo "CPU 信息：$(lscpu | grep 'Model name')"
+        echo "内存使用：$(free -h)"
+        echo "硬盘情况：" && df -hT
 
-      - name: Set up Build Environment
-        run: |
-          sudo apt update
-          sudo apt install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
-            gettext git libncurses-dev libssl-dev python3-distutils rsync unzip zlib1g-dev \
-            file wget python3 python2 ccache libelf-dev ecj fastjar java-propose-classpath \
-            libglib2.0-dev xmlto libtool libxslt-dev xsltproc bc
+    - name: Init Build Env
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        docker rmi $(docker images -q)
+        sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android $AGENT_TOOLSDIRECTORY
+        sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* dotnet* google* firefox powershell openjdk* mongodb* moby* || true
+        sudo -E apt-get -y update
+        sudo -E apt-get -y install $(curl -fsSL is.gd/depends_ubuntu_2204)
+        sudo timedatectl set-timezone "$TZ"
 
-      - name: Clone OpenWrt Source
-        run: |
-          git clone https://github.com/openwrt/openwrt -b master openwrt
-          cd openwrt
-          ./scripts/feeds update -a
-          ./scripts/feeds install -a
+    - name: Combine Disks
+      uses: easimon/maximize-build-space@master
+      with:
+        swap-size-mb: 1024
+        temp-reserve-mb: 100
+        root-reserve-mb: 1024
 
-      - name: Copy Custom Config & Script
-        run: |
-          cp ../configs/ax18.config openwrt/.config
-          cp ../diy-script.sh openwrt/diy-script.sh
-          chmod +x openwrt/diy-script.sh
-          cd openwrt
-          ./diy-script.sh
+    - name: Checkout
+      uses: actions/checkout@v3
 
-      - name: Download Prerequisites
-        run: |
-          cd openwrt
-          make defconfig
-          make download -j8
+    - name: Clone Source
+      run: |
+        git clone --depth 1 -b $REPO_BRANCH $REPO_URL openwrt
+        cd openwrt
+        echo "OPENWRT_PATH=$PWD" >> $GITHUB_ENV
+        echo "VERSION_KERNEL=$(grep -oP 'LINUX_KERNEL_HASH-\K[0-9]+\.[0-9]+\.[0-9]+' target/linux/generic/kernel-6.12)" >> $GITHUB_ENV
+        VERSION_INFO=$(git show -s --date=short --format="作者: %an<br/>时间: %cd<br/>内容: %s<br/>hash: %H")
+        echo "VERSION_INFO=$VERSION_INFO" >> $GITHUB_ENV
 
-      - name: Build Firmware
-        run: |
-          cd openwrt
-          make -j$(nproc)
+    - name: Generate Variables
+      run: |
+        cp $CONFIG_FILE $OPENWRT_PATH/.config
+        cd $OPENWRT_PATH
+        make defconfig > /dev/null 2>&1
+        SOURCE_REPO="$(echo $REPO_URL | awk -F '/' '{print $(NF)}')"
+        echo "SOURCE_REPO=$SOURCE_REPO" >> $GITHUB_ENV
+        DEVICE_TARGET=$(grep CONFIG_TARGET_BOARD .config | cut -d '"' -f2)
+        echo "DEVICE_TARGET=$DEVICE_TARGET" >> $GITHUB_ENV
+        DEVICE_SUBTARGET=$(grep CONFIG_TARGET_SUBTARGET .config | cut -d '"' -f2)
+        echo "DEVICE_SUBTARGET=$DEVICE_SUBTARGET" >> $GITHUB_ENV
 
-      - name: Upload Firmware to Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: openwrt-ax18-firmware
-          path: openwrt/bin/targets/
+    - name: Cache Toolchain
+      if: env.CACHE_TOOLCHAIN == 'true'
+      uses: HiGarfield/cachewrtbuild@main
+      with:
+        ccache: false
+        mixkey: ${{ env.SOURCE_REPO }}-${{ env.REPO_BRANCH }}-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
+        prefix: ${{ env.OPENWRT_PATH }}
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        if: github.event_name == 'workflow_dispatch'
-        with:
-          name: AX18 OpenWrt Firmware ${{ github.run_number }}
-          tag_name: ax18-${{ github.run_number }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Install Feeds
+      run: |
+        cd $OPENWRT_PATH
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
 
-      - name: Upload Firmware to Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: ax18-${{ github.run_number }}
-          name: openwrt-ax18
-          files: |
-            openwrt/bin/targets/*/*.bin
-            openwrt/bin/targets/*/*.img
-            openwrt/bin/targets/*/*.tar
-            openwrt/bin/targets/*/*.manifest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Load Custom Configuration
+      run: |
+        [ -e files ] && mv files $OPENWRT_PATH/files
+        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $OPENWRT_PATH/.config
+        chmod +x $DIY_SCRIPT
+        cd $OPENWRT_PATH
+        $GITHUB_WORKSPACE/$DIY_SCRIPT
+
+    - name: Download DL Package
+      run: |
+        cd $OPENWRT_PATH
+        make defconfig
+        make download -j8
+        find dl -size -1024c -exec rm -f {} \;
+
+    - name: Compile Firmware
+      id: compile
+      run: |
+        cd $OPENWRT_PATH
+        make -j$(nproc) || make -j1 V=s
+        echo "status=success" >> $GITHUB_OUTPUT
+        echo "DATE=$(date +"%Y-%m-%d %H:%M:%S")" >> $GITHUB_ENV
+        echo "FILE_DATE=$(date +"%Y.%m.%d")" >> $GITHUB_ENV
+
+    - name: Upload Bin Directory
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_BIN_DIR == 'true'
+      uses: actions/upload-artifact@main
+      with:
+        name: ${{ env.SOURCE_REPO }}-bin-${{ env.FILE_DATE }}
+        path: ${{ env.OPENWRT_PATH }}/bin
+
+    - name: Organize Files
+      if: steps.compile.outputs.status == 'success'
+      run: |
+        cd $OPENWRT_PATH/bin/targets/*/*
+        cat sha256sums
+        cp $OPENWRT_PATH/.config build.config
+        mv -f $OPENWRT_PATH/bin/packages/*/*/*.ipk packages
+        tar -zcf Packages.tar.gz packages
+        rm -rf packages feeds.buildinfo version.buildinfo
+        echo "FIRMWARE_PATH=$PWD" >> $GITHUB_ENV
+
+    - name: Upload Firmware to Artifact
+      if: steps.compile.outputs.status == 'success' && env.FIRMWARE_RELEASE != 'true'
+      uses: actions/upload-artifact@main
+      with:
+        name: ${{ env.SOURCE_REPO }}-firmware-${{ env.FILE_DATE }}
+        path: ${{ env.FIRMWARE_PATH }}
+
+    - name: Upload Firmware to Release
+      if: steps.compile.outputs.status == 'success' && env.FIRMWARE_RELEASE == 'true'
+      uses: ncipollo/release-action@v1
+      with:
+        name: R${{ env.DATE }} for ${{ env.FIRMWARE_TAG }}
+        allowUpdates: true
+        tag: ${{ env.FIRMWARE_TAG }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        artifacts: ${{ env.FIRMWARE_PATH }}/*
+        body: |
+          **This is OpenWrt Firmware for CMIOT-AX18**
+          ### 📦 固件概况
+          - ✅ 启用 NSS / IPv6 / UPnP / OpenClash
+          - ❌ 禁用 WiFi 驱动（纯有线）
+          - 🌐 默认 IP：192.168.0.1
+          - 🔥 使用 firewall4 / 内核 6.12
+          - 🔑 默认密码：password
+          ### 🔄 源码信息
+          - 仓库: ${{ env.REPO_URL }}
+          - 分支: ${{ env.REPO_BRANCH }}
+          - 内核版本: ${{ env.VERSION_KERNEL }}
+          - 最后提交:  
+            ${{ env.VERSION_INFO }}
