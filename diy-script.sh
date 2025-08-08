@@ -4,10 +4,6 @@ set -eux
 # 修改默认IP为192.168.0.1
 sed -i 's/192.168.1.1/192.168.0.1/g' package/base-files/files/bin/config_generate
 
-# 移除所有不必要的包
-rm -rf feeds/packages/*
-rm -rf feeds/luci/*
-
 # Git稀疏克隆，只克隆指定目录到本地
 function git_sparse_clone() {
   branch="$1" repourl="$2" && shift 2
