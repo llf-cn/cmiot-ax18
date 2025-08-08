@@ -17,10 +17,6 @@ function git_sparse_clone() {
 # 添加 OpenClash 源
 echo 'src-git openclash https://github.com/vernesong/OpenClash' >> feeds.conf.default
 
-# 确保编译目标为cmiot-ax18
-sed -i 's/CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_.*=y/CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_cmiot_ax18=y/' .config
-sed -i 's/IMAGE_PREFIX.*/IMAGE_PREFIX:=openwrt-qualcommax-ipq60xx-cmiot_ax18/' target/linux/qualcommax/ipq60xx/image.mk
-
 # 修复 armv8 设备 xfsprogs 报错
 sed -i 's/TARGET_CFLAGS.*/TARGET_CFLAGS += -DHAVE_MAP_SYNC -D_LARGEFILE64_SOURCE/g' feeds/packages/utils/xfsprogs/Makefile
 
