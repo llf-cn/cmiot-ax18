@@ -29,7 +29,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android "$AGENT_TOOLSDIRECTORY"
           sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* dotnet* google* firefox powershell openjdk* mongodb* moby* || true
           sudo -E apt-get -y update
-          sudo -E apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git gperf intltool jikespg libncurses5-dev libssl-dev libxml-parser-perl patch psmisc qemu-utils scons subversion unzip zlib1g-dev libgmp3-dev libmpc-dev libmpfr-dev rsync wget
+          sudo -E apt-get -y install build-essential asciidoc binutils bzip2 gawk gettext git gperf intltool libncurses5-dev libssl-dev libxml-parser-perl patch psmisc qemu-utils scons subversion unzip zlib1g-dev libgmp-dev libmpc-dev libmpfr-dev rsync wget
           sudo timedatectl set-timezone "$TZ"
 
       - name: Maximize build space
