@@ -86,7 +86,7 @@ jobs:
 
     - name: Cache Toolchain(缓存工具链)
       if: env.CACHE_TOOLCHAIN == 'true'
-      uses: HiGarfield/cachewrtbuild@abcdef1234567890 # 示例 SHA，替换为实际 commit SHA
+      uses: HiGarfield/cachewrtbuild@main # 示例 SHA，替换为实际 commit SHA
       with:
         ccache: false
         mixkey: ${{ env.SOURCE_REPO }}-${{ env.REPO_BRANCH }}-${{ env.DEVICE_TARGET }}-${{ env.DEVICE_SUBTARGET }}
