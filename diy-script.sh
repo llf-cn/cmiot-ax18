@@ -14,9 +14,8 @@ function git_sparse_clone() {
   cd .. && rm -rf $repodir
 }
 
-# 添加OpenClash插件
-git_sparse_clone master https://github.com/vernesong/OpenClash luci-app-openclash
-
+# 添加 OpenClash 源
+echo 'src-git openclash https://github.com/vernesong/OpenClash' >> feeds.conf.default
 
 # 确保编译目标为cmiot-ax18
 sed -i 's/CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_.*=y/CONFIG_TARGET_DEVICE_qualcommax_ipq60xx_DEVICE_cmiot_ax18=y/' .config
