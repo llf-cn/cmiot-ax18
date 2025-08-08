@@ -1,0 +1,91 @@
+```
+name: Build OpenWrt Firmware for CMIOT-AX18
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  OPENWRT_PATH: openwrt
+  CONFIG_FILE: configs/cmiot-ax18.config
+  DIY_SCRIPT: diy-script.sh
+  TZ: Asia/Shanghai
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Init Build Env
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          docker rmi $(docker images -q | sort -u) --force
+          sudo rm -rf /usr/share/dotnet /etc/apt/sources.list.d /usr/local/lib/android $AGENT_TOOLSDIRECTORY
+          sudo -E apt-get -y purge azure-cli ghc* zulu* llvm* dotnet* google* firefox powershell openjdk* mongodb* moby* || true
+          sudo -E apt-get -y update
+          sudo -E apt-get -y install $(cat depends_ubuntu_2204.txt)
+          sudo timedatectl set-timezone "$TZ"
+
+      - name: Cache Toolchain
+        uses: HiGarfield/cachewrtbuild@abcdef1234567890 # 示例 SHA，替换为实际 commit SHA
+        with:
+          mixkey: ${{ github.job }}-${{ github.sha }}
+
+      - name: Clone OpenWrt Source
+        run: |
+          git clone https://git.openwrt.org/openwrt/openwrt.git $OPENWRT_PATH
+          cd $OPENWRT_PATH
+          git checkout v23.05.0 # 示例版本，替换为实际版本
+
+      - name: Install Feeds
+        run: |
+          cd $OPENWRT_PATH
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Load Custom Configuration
+        run: |
+          [ -e files ] && mv files $OPENWRT_PATH/files || echo "Warning: files directory not found"
+          [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $OPENWRT_PATH/.config || { echo "Error: $CONFIG_FILE not found"; exit 1; }
+          chmod +x $DIY_SCRIPT
+          cd $OPENWRT_PATH
+          $GITHUB_WORKSPACE/$DIY_SCRIPT
+          make defconfig 2>&1 | tee defconfig.log
+
+      - name: Compile Firmware
+        id: compile
+        run: |
+          cd $OPENWRT_PATH
+          make -j$(nproc) || make -j1 V=s
+          echo "status=success" >> $GITHUB_OUTPUT
+
+      - name: Upload Firmware to Artifact
+        if: steps.compile.outputs.status == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-cmiot-ax18
+          path: |
+            $OPENWRT_PATH/bin/targets/*/*/*
+            !${OPENWRT_PATH}/bin/targets/*/*/packages
+
+      - name: Upload Firmware to Release
+        if: steps.compile.outputs.status == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            $OPENWRT_PATH/bin/targets/*/*/openwrt-*.bin
+          tag_name: ${{ env.FIRMWARE_TAG }}
+          name: OpenWrt Firmware ${{ env.FIRMWARE_TAG }}
+          body: |
+            Built for CMIOT-AX18 with tag: ${{ env.FIRMWARE_TAG }}
+          draft: false
+          prerelease: false
+```
