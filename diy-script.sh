@@ -29,9 +29,6 @@ EOF
 # 生成配置文件（替代 uci 调用）
 # ================================
 
-# ==== 1. 保留原有包，确保 opkg 在固件中 ====
-sed -i 's/DEFAULT_PACKAGES:=\(.*\)/DEFAULT_PACKAGES:=\1 opkg/' include/target.mk
-
 # ==== 2. 如果启用了 opkg-smime，关闭强制签名检查 ====
 if grep -q "CONFIG_PACKAGE_opkg-smime=y" .config 2>/dev/null; then
     echo "option check_signature 0" >> package/system/opkg/files/opkg.conf
