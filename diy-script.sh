@@ -29,6 +29,9 @@ EOF
 # 生成配置文件（替代 uci 调用）
 # ================================
 
+# 保留原有包，只追加 opkg
+sed -i 's/DEFAULT_PACKAGES:=\(.*\)/DEFAULT_PACKAGES:=\1 opkg/' include/target.mk
+
 CONFIG_DIR="./files/etc/config"
 mkdir -p "$CONFIG_DIR"
 
