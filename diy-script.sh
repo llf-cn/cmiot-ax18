@@ -29,9 +29,6 @@ EOF
 # 生成配置文件（替代 uci 调用）
 # ================================
 
-# 强制把默认包管理器换回 opkg
-sed -i 's/DEFAULT_PACKAGES:=.*/DEFAULT_PACKAGES:=base-files busybox opkg firewall4/' include/target.mk
-
 CONFIG_DIR="./files/etc/config"
 mkdir -p "$CONFIG_DIR"
 
