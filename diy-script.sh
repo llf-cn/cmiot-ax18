@@ -2,7 +2,7 @@
 set -eux
 
 # ================================
-# AX18 OpenClash 自定义脚本
+# AX18 OpenClash 自定义脚本（仅 apk）
 # ================================
 
 # 修改默认IP为192.168.0.1
@@ -26,20 +26,18 @@ CONFIG_TARGET_qualcommax_ipq60xx_DEVICE_cmiot_ax18=y
 EOF
 
 # ================================
-# 生成配置文件（替代 uci 调用）
+# 自定义配置文件
 # ================================
-
-# ==== 2. 添加 apk 安装别名 ====
-mkdir -p package/base-files/files/etc
-cat >> package/base-files/files/etc/profile <<'EOF'
-
-# 使用 apk 安装（允许未签名）
-alias apkinstall='apk add --allow-untrusted'
-
-CONFIG_DIR="./files/etc/config"
+CONFIG_DIR="package/base-files/files/etc/config"
 mkdir -p "$CONFIG_DIR"
 
-# network 配置（启用 IPv6）
+# ==== 1. 添加 apk 安装别名 ====
+cat >> package/base-files/files/etc/profile <<'EOF'
+# 使用 apk 安装（允许未签名）
+alias apkinstall='apk add --allow-untrusted'
+EOF
+
+# ==== 2. network 配置（启用 IPv6）====
 cat > "$CONFIG_DIR/network" <<'EOF'
 config interface 'loopback'
 	option ifname 'lo'
@@ -56,7 +54,7 @@ config interface 'lan'
 	option ipv6 '1'
 EOF
 
-# firewall 配置（启用 firewall4）
+# ==== 3. firewall 配置（firewall4）====
 cat > "$CONFIG_DIR/firewall" <<'EOF'
 config defaults
 	option syn_flood '1'
@@ -83,38 +81,38 @@ config forwarding
 	option dest 'wan'
 EOF
 
-# upnp 配置（启用 UPnP）
+# ==== 4. upnp 配置 ====
 cat > "$CONFIG_DIR/upnpd" <<'EOF'
 config upnpd 'config'
 	option enabled '1'
 	option secure_mode '1'
 EOF
 
-# wireless 配置（禁用 WiFi）
+# ==== 5. wireless 配置（禁用 WiFi）====
 cat > "$CONFIG_DIR/wireless" <<'EOF'
 # WiFi 已禁用
 EOF
 
-# system 配置（Dropbear、uHTTPd 默认启用）
+# ==== 6. system 配置 ====
 cat > "$CONFIG_DIR/system" <<'EOF'
 config system
 	option hostname 'AX18'
 	option timezone 'CST-8'
 EOF
 
-# openclash 配置（默认启用）
+# ==== 7. openclash 配置 ====
 cat > "$CONFIG_DIR/openclash" <<'EOF'
 # OpenClash 默认启用
 EOF
 
-# dropbear 配置（保持默认即可）
+# ==== 8. dropbear 配置 ====
 cat > "$CONFIG_DIR/dropbear" <<'EOF'
 config dropbear
 	option PasswordAuth 'on'
 	option RootPasswordAuth 'on'
 EOF
 
-# uhttpd 配置（保持默认即可）
+# ==== 9. uhttpd 配置 ====
 cat > "$CONFIG_DIR/uhttpd" <<'EOF'
 config uhttpd 'main'
 	option listen_http '0.0.0.0:80'
