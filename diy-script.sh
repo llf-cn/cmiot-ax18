@@ -5,19 +5,23 @@ set -eux
 # AX18 OpenClash 自定义脚本（仅 apk）
 # ================================
 
-# 修改默认IP为192.168.0.1
+# 修改默认 IP
 sed -i 's/192.168.1.1/192.168.0.1/g' package/base-files/files/bin/config_generate
 
 # 添加 OpenClash 源
 echo 'src-git openclash https://github.com/vernesong/OpenClash' >> feeds.conf.default
 
 # 修正 Makefile 路径
-find package/*/ -maxdepth 2 -path "*/Makefile" | xargs -i sed -i 's|\.\./\.\./luci.mk|$(TOPDIR)/feeds/luci/luci.mk|g' {}
-find package/*/ -maxdepth 2 -path "*/Makefile" | xargs -i sed -i 's|\.\./\.\./lang/golang/golang-package.mk|$(TOPDIR)/feeds/packages/lang/golang/golang-package.mk|g' {}
-find package/*/ -maxdepth 2 -path "*/Makefile" | xargs -i sed -i 's|PKG_SOURCE_URL:=@GHREPO|PKG_SOURCE_URL:=https://github.com|g' {}
-find package/*/ -maxdepth 2 -path "*/Makefile" | xargs -i sed -i 's|PKG_SOURCE_URL:=@GHCODELOAD|PKG_SOURCE_URL:=https://codeload.github.com|g' {}
+find package/*/ -maxdepth 2 -path "*/Makefile" | xargs -i sed -i \
+    's|\.\./\.\./luci.mk|$(TOPDIR)/feeds/luci/luci.mk|g' {}
+find package/*/ -maxdepth 2 -path "*/Makefile" | xargs -i sed -i \
+    's|\.\./\.\./lang/golang/golang-package.mk|$(TOPDIR)/feeds/packages/lang/golang/golang-package.mk|g' {}
+find package/*/ -maxdepth 2 -path "*/Makefile" | xargs -i sed -i \
+    's|PKG_SOURCE_URL:=@GHREPO|PKG_SOURCE_URL:=https://github.com|g' {}
+find package/*/ -maxdepth 2 -path "*/Makefile" | xargs -i sed -i \
+    's|PKG_SOURCE_URL:=@GHCODELOAD|PKG_SOURCE_URL:=https://codeload.github.com|g' {}
 
-# ===== 强制锁定 CMIOT-AX18 设备 =====
+# ===== 锁定 CMIOT-AX18 设备 =====
 sed -i '/CONFIG_TARGET_.*DEVICE_/d' .config
 cat >> .config <<'EOF'
 CONFIG_TARGET_qualcommax=y
@@ -31,13 +35,13 @@ EOF
 CONFIG_DIR="package/base-files/files/etc/config"
 mkdir -p "$CONFIG_DIR"
 
-# ==== 1. 添加 apk 安装别名 ====
+# 添加 apk 安装别名
 cat >> package/base-files/files/etc/profile <<'EOF'
 # 使用 apk 安装（允许未签名）
 alias apkinstall='apk add --allow-untrusted'
 EOF
 
-# ==== 2. network 配置（启用 IPv6）====
+# network 配置
 cat > "$CONFIG_DIR/network" <<'EOF'
 config interface 'loopback'
 	option ifname 'lo'
@@ -54,7 +58,7 @@ config interface 'lan'
 	option ipv6 '1'
 EOF
 
-# ==== 3. firewall 配置（firewall4）====
+# firewall4 配置
 cat > "$CONFIG_DIR/firewall" <<'EOF'
 config defaults
 	option syn_flood '1'
@@ -81,38 +85,38 @@ config forwarding
 	option dest 'wan'
 EOF
 
-# ==== 4. upnp 配置 ====
+# UPnP 配置
 cat > "$CONFIG_DIR/upnpd" <<'EOF'
 config upnpd 'config'
 	option enabled '1'
 	option secure_mode '1'
 EOF
 
-# ==== 5. wireless 配置（禁用 WiFi）====
+# 禁用 WiFi
 cat > "$CONFIG_DIR/wireless" <<'EOF'
 # WiFi 已禁用
 EOF
 
-# ==== 6. system 配置 ====
+# system 配置
 cat > "$CONFIG_DIR/system" <<'EOF'
 config system
 	option hostname 'AX18'
 	option timezone 'CST-8'
 EOF
 
-# ==== 7. openclash 配置 ====
+# openclash 配置
 cat > "$CONFIG_DIR/openclash" <<'EOF'
 # OpenClash 默认启用
 EOF
 
-# ==== 8. dropbear 配置 ====
+# dropbear 配置
 cat > "$CONFIG_DIR/dropbear" <<'EOF'
 config dropbear
 	option PasswordAuth 'on'
 	option RootPasswordAuth 'on'
 EOF
 
-# ==== 9. uhttpd 配置 ====
+# uhttpd 配置
 cat > "$CONFIG_DIR/uhttpd" <<'EOF'
 config uhttpd 'main'
 	option listen_http '0.0.0.0:80'
@@ -121,8 +125,8 @@ config uhttpd 'main'
 EOF
 
 echo "==============================="
-echo "AX18 OpenClash 自定义脚本执行完成"
-echo "IPv6, firewall4, UPnP, Dropbear, uHTTPd, OpenClash 已启用（通过配置文件）"
+echo "AX18 OpenClash 自定义脚本（仅 apk）执行完成"
+echo "IPv6, firewall4, UPnP, Dropbear, uHTTPd, OpenClash 已启用"
 echo "WiFi 配置已清理"
 echo "默认 IP: 192.168.0.1"
 echo "==============================="
