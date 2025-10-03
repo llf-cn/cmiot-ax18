@@ -29,17 +29,12 @@ EOF
 # 生成配置文件（替代 uci 调用）
 # ================================
 
-# ==== 2. 如果启用了 opkg-smime，关闭强制签名检查 ====
-if grep -q "CONFIG_PACKAGE_opkg-smime=y" .config 2>/dev/null; then
-    echo "option check_signature 0" >> package/system/opkg/files/opkg.conf
-fi
+# ==== 2. 添加 apk 安装别名 ====
+mkdir -p package/base-files/files/etc
+cat >> package/base-files/files/etc/profile <<'EOF'
 
-# ==== 3. 运行时默认安装未签名包 ====
-echo "option check_signature 0" >> package/base-files/files/etc/opkg.conf
-
-# ==== 4. 添加安装别名 ====
-echo "alias ipkinstall='opkg install --force-overwrite --force-depends'" >> package/base-files/files/etc/profile
-echo "alias apkinstall='apk add --allow-untrusted'" >> package/base-files/files/etc/profile
+# 使用 apk 安装（允许未签名）
+alias apkinstall='apk add --allow-untrusted'
 
 CONFIG_DIR="./files/etc/config"
 mkdir -p "$CONFIG_DIR"
